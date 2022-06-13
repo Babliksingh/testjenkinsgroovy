@@ -1,10 +1,61 @@
 pipeline {
     agent any
-      stages {
-        stage('build') {
-          steps {
-            echo"Welcome to build stage"
+	
+	  tools
+    {
+       maven "Maven"
+    }
+ stages {
+      stage('checkout') {
+           steps {
+             
+                git branch: 'main', url: 'https://github.com/Babliksingh/foodappautomation.git'
           }
-         }
-       }
-  }
+        }
+	 stage('Execute Maven') {
+           steps {
+             
+                sh 'mvn clean package -DskipTests=true'             
+          }
+        }
+        
+
+  stage('Docker Build and Tag') {
+           steps {
+              
+                sh 'docker build -t foodappautomation:latest .' 
+                sh 'docker tag foodappautomation:latest Babliksingh/foodappautomation
+                //sh 'docker tag foodappautomation:latest Babliksingh/foodappautomation:$BUILD_NUMBER'
+               
+          }
+        }
+     
+  stage('Publish image to DockerHub') {
+          
+            steps {
+        withDockerRegistry([ credentialsId: "dockerHub", url: "https://hub.docker.com/" ]) {
+          sh  'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
+          sh  'docker push Babliksingh/foodappautomation:latest'
+        //  sh  'docker push Babliksingh/foodappautomation:$BUILD_NUMBER' 
+        }
+                  
+          }
+        }
+     
+      stage('Run Docker container on Jenkins Agent') {
+             
+            steps 
+			{
+                sh "docker run -d -p 3000 Babliksingh/foodappautomation:latest"
+ 
+            }
+        }
+ stage('Run Docker container on remote hosts') {
+             
+            steps {
+                sh "docker -H ssh://jenkins@15.206.88.112 run -d -p 3000 Babliksingh/foodappautomation:latest"
+ 
+            }
+        }
+    }
+	}
